@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+
+jenv_dir=${HOME}/.jenv
+jenv_versions_dir=${jenv_dir}/versions
+
+if [[ ! -d ${jenv_dir} ]]; then
+  mkdir "${jenv_dir}"
+fi
+
+if [[ ! -d ${jenv_versions_dir} ]]; then
+  mkdir "${jenv_versions_dir}"
+fi
+
+print_usage() {
+  echo "jenv-git-bash 1.0 (c) TheCheerfulDev"
+  echo "Usage: jenv <command> [<args>]"
+  echo ""
+  echo "Commands:"
+  echo "    local <alias>       Set the local (sub-)directory specific Java version"
+  echo "    global <alias>      Set the global Java version"
+  echo "    version             Show the current Java version and its origin"
+  echo "    versions            List all Java versions available to jenv-git-bash"
+  echo "    add <jdk> <alias>   Add JDK into jenv-git-bash with the given alias(es)"
+  echo ""
+  echo "Java version precedence: local > global > JAVA_HOME"
+}
+
+add_jdk() {
+  shift
+  JDK_PATH=$1
+  shift
+  for alias in "$@"; do
+    echo "${JDK_PATH}" > "${HOME}/.jenv/versions/${alias}"
+  done
+}
+
+list_versions() {
+  find_local_version_file "${PWD}"
+  find_java_versions
+
+  for java_version in ${java_versions}; do
+    if [[ -f ${java_version_file} ]] && [[ ${java_version} == $(< "${java_version_file}") ]]; then
+      echo "* ${java_version} (set by ${java_version_file})"
+    else
+      echo "  ${java_version}"
+    fi
+  done
+
+}
+
+find_java_versions() {
+  java_versions=$(find "${jenv_versions_dir}" -maxdepth 1 -type f | sort | sed "s|^${jenv_versions_dir}/||g")
+}
+
+find_local_version_file() {
+  local root="$1"
+  while [ -n "$root" ]; do
+    if [ -e "${root}/.java-version" ]; then
+      java_version_file="${root}/.java-version"
+      return
+    fi
+    root="${root%/*}"
+  done
+}
+
+print_active_version() {
+  find_local_version_file "${PWD}"
+  if [[ -f "${java_version_file}" ]]; then
+    echo "$(< "${java_version_file}") (set by ${java_version_file})"
+    exit 0;
+  elif [[ -f ${jenv_dir}/.java-version ]]; then
+    echo "$(< "${jenv_dir}"/.java-version) (set by ${jenv_dir}/.java-version)"
+    exit 0;
+  fi
+
+  echo "system default (set by JAVA_HOME)"
+}
+
+set_local_java_version() {
+  if [[ -z ${1} ]]; then
+    echo "Missing the Java version you want to set for this directory."
+    exit 1;
+  fi
+
+  if [[ ! -f ${jenv_versions_dir}/${1} ]]; then
+    echo "Java version [${1}] doesn't exist."
+    exit 1;
+  fi
+
+  echo "${1}" > .java-version
+  exit 0;
+}
+
+set_global_java_version() {
+  if [[ -z ${1} ]]; then
+    echo "Missing the Java version you want to set globally."
+    exit 1;
+  fi
+
+  if [[ ! -f ${jenv_versions_dir}/${1} ]]; then
+    echo "Java version [${1}] doesn't exist."
+    exit 1;
+  fi
+
+  echo "${1}" > "${jenv_dir}"/.java-version
+  exit 0;
+}
+
+case $1 in
+  add)
+    add_jdk "$@"
+    exit 0
+    ;;
+  local)
+    set_local_java_version "$2"
+    exit 0
+    ;;
+  global)
+    set_global_java_version "$2"
+    exit 0;
+    ;;
+  versions)
+    list_versions
+    exit 0
+    ;;
+  version)
+    print_active_version
+    exit 0
+    ;;
+  *)
+    print_usage
+    exit 0
+    ;;
+esac

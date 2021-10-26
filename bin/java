@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+find_local_version_file() {
+  local root="$1"
+  while [ -n "$root" ]; do
+    if [ -e "${root}/.java-version" ]; then
+      java_version_file="${root}/.java-version"
+      return
+    fi
+    root="${root%/*}"
+  done
+}
+
+find_local_version_file "${PWD}"
+
+if [[ -f "${java_version_file}" ]]; then
+  alias=$(< "${java_version_file}")
+  export JAVA_HOME=$(< "${HOME}"/.jenv/versions/"${alias}")
+elif [[ -f ${HOME}/.jenv/.java-version ]]; then
+  alias=$(< "${HOME}"/.jenv/.java-version)
+  export JAVA_HOME=$(< "${HOME}"/.jenv/versions/"${alias}")
+fi
+
+if [[ -z ${JAVA_HOME} ]]; then
+  echo "No system default JAVA_HOME set."
+  return 1;
+fi
+
+${JAVA_HOME}/bin/java "${*}"

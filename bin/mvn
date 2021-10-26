@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+if [[ -f .java-version ]]; then
+  alias=$(<.java-version)
+  export JAVA_HOME=$(< "${HOME}"/.jenv/versions/"${alias}")
+elif [[ -f ${HOME}/.jenv/.java-version ]]; then
+  alias=$(< "${HOME}"/.jenv/.java-version)
+  export JAVA_HOME=$(< "${HOME}"/.jenv/versions/"${alias}")
+fi
+
+if [[ -z ${JAVA_HOME} ]]; then
+  echo "No system default JAVA_HOME set."
+  return 1;
+fi
+
+#MAVEN_DIR=${M2_HOME:-$MAVEN_HOME:-$JENV_MAVEN_HOME}
+MAVEN_DIR=${JENV_MAVEN_HOME:-$M2_HOME:-$MAVEN_HOME}
+
+if [[ -z ${MAVEN_DIR} ]]; then
+  echo "No MAVEN found. Set either JENV_MAVEN_HOME, M2_HOME or MAVEN_HOME. They will be read in that order."
+fi
+
+${MAVEN_DIR}/bin/mvn "${*}"
