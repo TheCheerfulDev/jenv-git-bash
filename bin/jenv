@@ -12,15 +12,16 @@ if [[ ! -d ${jenv_versions_dir} ]]; then
 fi
 
 print_usage() {
-  echo "jenv-git-bash 1.0 (c) TheCheerfulDev"
+  echo "jenv-git-bash 1.1 (c) TheCheerfulDev"
   echo "Usage: jenv <command> [<args>]"
   echo ""
   echo "Commands:"
-  echo "    local <alias>       Set the local (sub-)directory specific Java version"
-  echo "    global <alias>      Set the global Java version"
+  echo "    local <jdk>         Set the local (sub-)directory specific Java version"
+  echo "    global <jdk>        Set the global Java version"
   echo "    version             Show the current Java version and its origin"
   echo "    versions            List all Java versions available to jenv-git-bash"
-  echo "    add <jdk> <alias>   Add JDK into jenv-git-bash with the given alias(es)"
+  echo "    add <path> <alias>  Add JDK into jenv-git-bash with the given alias(es)"
+  echo "    remove <jdk>        Remove JDK installation from jenv-git-bash with the given alias"
   echo ""
   echo "Java version precedence: local > global > JAVA_HOME"
 }
@@ -30,7 +31,12 @@ add_jdk() {
   JDK_PATH=$1
   shift
   for alias in "$@"; do
-    echo "${JDK_PATH}" > "${HOME}/.jenv/versions/${alias}"
+    if [[ -f "${jenv_dir}/versions/${alias}" ]]; then
+      echo "${alias} already exists, skipping."
+    else
+      echo "${JDK_PATH}" > "${jenv_dir}/versions/${alias}"
+      echo "${alias} added."
+    fi
   done
 }
 
@@ -41,6 +47,8 @@ list_versions() {
   for java_version in ${java_versions}; do
     if [[ -f ${java_version_file} ]] && [[ ${java_version} == $(< "${java_version_file}") ]]; then
       echo "* ${java_version} (set by ${java_version_file})"
+    elif [[ -f ${jenv_dir}/.java-version ]] && [[ ${java_version} == $(< "${jenv_dir}/.java-version") ]]; then
+      echo "* ${java_version} (set by ${jenv_dir}/.java-version)"
     else
       echo "  ${java_version}"
     fi
@@ -67,10 +75,10 @@ print_active_version() {
   find_local_version_file "${PWD}"
   if [[ -f "${java_version_file}" ]]; then
     echo "$(< "${java_version_file}") (set by ${java_version_file})"
-    exit 0;
+    exit 0
   elif [[ -f ${jenv_dir}/.java-version ]]; then
     echo "$(< "${jenv_dir}"/.java-version) (set by ${jenv_dir}/.java-version)"
-    exit 0;
+    exit 0
   fi
 
   echo "system default (set by JAVA_HOME)"
@@ -78,32 +86,74 @@ print_active_version() {
 
 set_local_java_version() {
   if [[ -z ${1} ]]; then
-    echo "Missing the Java version you want to set for this directory."
-    exit 1;
+    echo "Please provide the JDK you want to set locally."
+    echo "Usage: jenv local [<jdk>|--unset]"
+    exit 1
+  fi
+
+  if [[ ${1} == "--unset" ]]; then
+    if [[ ! -f .java-version ]]; then
+      echo "No local version configured for this directory."
+      exit 1
+    else
+      rm -r .java-version
+      echo "Local version unset."
+      exit 0
+    fi
   fi
 
   if [[ ! -f ${jenv_versions_dir}/${1} ]]; then
-    echo "Java version [${1}] doesn't exist."
-    exit 1;
+    echo "JDK ${1} doesn't exist."
+    exit 1
   fi
 
   echo "${1}" > .java-version
-  exit 0;
+  echo "Local version set to ${1}."
+  exit 0
 }
 
 set_global_java_version() {
   if [[ -z ${1} ]]; then
-    echo "Missing the Java version you want to set globally."
-    exit 1;
+    echo "Please provide the JDK you want to set globally."
+    echo "Usage: jenv global [<jdk>|--unset]"
+    exit 1
+  fi
+
+  if [[ ${1} == "--unset" ]]; then
+    if [[ ! -f ${jenv_dir}/.java-version ]]; then
+      echo "No global version configured."
+      exit 1
+    else
+      rm -r "${jenv_dir}"/.java-version
+      echo "Global version unset."
+      exit 0
+    fi
   fi
 
   if [[ ! -f ${jenv_versions_dir}/${1} ]]; then
-    echo "Java version [${1}] doesn't exist."
-    exit 1;
+    echo "JDK ${1} doesn't exist."
+    exit 1
   fi
 
   echo "${1}" > "${jenv_dir}"/.java-version
-  exit 0;
+  echo "Global version set to ${1}."
+  exit 0
+}
+
+remove_version() {
+  if [[ -z ${1} ]]; then
+      echo "Please provide the JDK you want to remove."
+      echo "Usage: jenv remove <jdk>"
+      exit 1
+    fi
+
+  if [[ ! -f ${jenv_versions_dir}/${1} ]]; then
+    echo "JDK ${1} doesn't exist."
+    exit 1
+  fi
+
+  rm -f "${jenv_versions_dir}"/"${1}"
+  echo "JDK ${1} removed."
 }
 
 case $1 in
@@ -117,7 +167,7 @@ case $1 in
     ;;
   global)
     set_global_java_version "$2"
-    exit 0;
+    exit 0
     ;;
   versions)
     list_versions
@@ -125,6 +175,10 @@ case $1 in
     ;;
   version)
     print_active_version
+    exit 0
+    ;;
+  remove)
+    remove_version "$2"
     exit 0
     ;;
   *)
